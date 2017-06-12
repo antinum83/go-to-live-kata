@@ -21,3 +21,5 @@ fi
 echo "Installing wordpress requisites"
 sudo apt-get install apache2 mysql-server php5
 
+echo "Setting up mysql"
+cat mysql.sql | mysql -u root -p
