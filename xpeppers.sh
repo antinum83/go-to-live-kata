@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Cleaning up files"
+rm -rf /tmp/wordpress*
+
 version=$1
 
 if [[ "$version" == "" ]]
@@ -8,10 +11,13 @@ then
 	exit 1
 fi 
 
+echo "Testing network connection"
 if [[ "$(ping -c 1 8.8.8.8 | grep '100% packet loss' )" != "" ]]
 then
-    echo "Internet isn't present"
-    exit 1
+	echo "Internet isn't present"
+	exit 1
+else
+	echo "Internet connection OK"
 fi
 
 echo "Downloading Wordpress version ${version}"
@@ -30,7 +36,7 @@ else
 	echo "Md5 check ok"
 fi
 
-echo "Installing wordpress requisites"
+echo "Installing wordpress prerequisites"
 sudo apt-get install apache2 mysql-server php5
 
 echo "Setting up mysql"
@@ -39,4 +45,17 @@ cat mysql.sql | mysql -u root -p
 echo "Extracting wordpress"
 tar xfz /tmp/wordpress-${version}.tar.gz -C /tmp
 
-rm /tmp/wordpress-${version}.tar.gz*
+echo "Modifying wp-config.php file"
+cp /tmp/wordpress/wp-config-sample.php /tmp/wordpress/wp-config.php
+sed -i -e 's/database_name_here/wordpress/g' /tmp/wordpress/wp-config.php
+sed -i -e 's/username_here/testuser/g' /tmp/wordpress/wp-config.php
+sed -i -e 's/password_here/password/g' /tmp/wordpress/wp-config.php
+
+while [[ $(grep 'put your unique phrase here' /tmp/wordpress/wp-config.php) != "" ]]
+do
+	rand=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+	sed -i -e "0,/put your unique phrase here/s//${rand}/" /tmp/wordpress/wp-config.php
+done
+
+
+echo "Done!"
