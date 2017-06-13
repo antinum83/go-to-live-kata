@@ -57,5 +57,6 @@ do
 	sed -i -e "0,/put your unique phrase here/s//${rand}/" /tmp/wordpress/wp-config.php
 done
 
+sudo mv /tmp/wordpress /var/www/html/
 
 echo "Done!"
