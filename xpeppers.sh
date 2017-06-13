@@ -2,6 +2,7 @@
 
 echo "Cleaning up files"
 rm -rf /tmp/wordpress*
+sudo rm -rf /var/www/html/wordpress*
 
 version=$1
 
