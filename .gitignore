@@ -3,3 +3,4 @@ helloworld.sqlite
 
 .idea
 .DS_Store
+*.*~

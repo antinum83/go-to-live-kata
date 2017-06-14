@@ -1,6 +1,7 @@
 #!/bin/bash
 
-#cfr https://codex.wordpress.org/Installing_WordPress
+# Installation instructions taken from: https://codex.wordpress.org/Installing_WordPress
+# Hardening taken from: https://codex.wordpress.org/Hardening_WordPress
 
 if [ "$#" -ne 4 ]
 then
@@ -54,7 +55,7 @@ else
 fi
 
 echo "Installing wordpress prerequisites"
-sudo apt-get install apache2 mysql-server php5 php5-mysqlnd-ms
+sudo apt-get -y install apache2 mysql-server php5 php5-mysqlnd-ms
 if [[ "$?" -ne 0 ]]
 then
 	echo "Errors getting wordpress prerequisites"
@@ -90,7 +91,45 @@ do
 	sed -i -e "0,/put your unique phrase here/s//${rand}/" /tmp/wordpress/wp-config.php
 done
 
+echo "Hardening wordpress"
+sudo a2enmod rewrite
+
+#File Permissions
+if [[ $(grep Allow /etc/apache2/sites-enabled/000-default.conf) == "" ]]
+then
+	sudo sed -i -e "s/VirtualHost \*\:80>/VirtualHost \*\:80>\n\t<Directory \/var\/www\/html>\n\t\tOptions Indexes FollowSymLinks MultiViews\n\t\tAllowOverride All\n\t\tOrder allow,deny\n\t\tallow from all\n\t\<\/Directory\>/g" /etc/apache2/sites-enabled/000-default.conf
+fi
+
+#WP-Includes
+#WP-Config.php
+
+cat > /tmp/wordpress/.htaccess <<'EOL'
+# Block the include-only files.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+RewriteRule ^wp-admin/includes/ - [F,L]
+RewriteRule !^wp-includes/ - [S=3]
+RewriteRule ^wp-includes/[^/]+\.php$ - [F,L]
+RewriteRule ^wp-includes/js/tinymce/langs/.+\.php - [F,L]
+RewriteRule ^wp-includes/theme-compat/ - [F,L]
+</IfModule>
+
+<files wp-config.php>
+order allow,deny
+deny from all
+</files>
+# BEGIN WordPress
+EOL
+
+#Disable File Editing
+echo "define('DISALLOW_FILE_EDIT', true);" >> /tmp/wordpress/wp-config.php
+
+echo "Moving wordpress to apache root"
 sudo mv /tmp/wordpress /var/www/html/
+
+find /var/www/html/wordpress/ -type d -exec chmod 755 {} \;
+find /var/www/html/wordpress/ -type f -exec chmod 644 {} \;
 
 if ! [[ -f /etc/apache2/conf-available/fqdn.conf ]]
 then
