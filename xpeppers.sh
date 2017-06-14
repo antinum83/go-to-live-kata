@@ -1,11 +1,8 @@
 #!/bin/bash
 
-# Installation instructions taken from: https://codex.wordpress.org/Installing_WordPress
-# Hardening taken from: https://codex.wordpress.org/Hardening_WordPress
-
-if [ "$#" -ne 4 ]
+if [ "$#" -ne 5 ]
 then
-	echo "Usage: ./xpeppers.sh <version|latest> <wordpress_db_name> <mysql_user> <mysql_password>"
+	echo "Usage: ./xpeppers.sh <version|latest> <wordpress_db_name> <mysql_user> <mysql_password> <mod-evasive notifications email>"
 exit 1
 fi
 
@@ -13,19 +10,7 @@ version=$1
 dbname=$2
 mysqluser=$3
 mysqlpasswd=$4
-
-echo "Cleaning up files"
-rm -rf /tmp/wordpress*
-sudo rm -rf /var/www/html/wordpress*
-
-echo "Testing network connection"
-if [[ "$(ping -c 1 8.8.8.8 | grep '100% packet loss' )" != "" ]]
-then
-	echo "Internet isn't present"
-	exit 1
-else
-	echo "Internet connection OK"
-fi
+modevasivemail=$5
 
 echo "Downloading Wordpress version ${version}"
 wget -c https://wordpress.org/wordpress-${version}.tar.gz -P /tmp
@@ -55,7 +40,7 @@ else
 fi
 
 echo "Installing wordpress prerequisites"
-sudo apt-get -y install apache2 mysql-server php5 php5-mysqlnd-ms
+sudo apt-get -y install apache2 mysql-server php5 php5-mysqlnd-ms libapache2-mod-security2 libapache2-mod-evasive
 if [[ "$?" -ne 0 ]]
 then
 	echo "Errors getting wordpress prerequisites"
@@ -125,11 +110,34 @@ EOL
 #Disable File Editing
 echo "define('DISALLOW_FILE_EDIT', true);" >> /tmp/wordpress/wp-config.php
 
-echo "Moving wordpress to apache root"
-sudo mv /tmp/wordpress /var/www/html/
+echo "Hardening PHP"
+sudo sed -i -e '/^disable_functions/ s/$/exec,system,shell_exec,passthrough/' /etc/php5/apache2/php.ini
+sudo sed -i -e "s/expose_php = On/expose_php = Off/g" /etc/php5/apache2/php.ini
+sudo sed -i -e "s/html_errors = On/html_errors = Off/g" /etc/php5/apache2/php.ini
 
-find /var/www/html/wordpress/ -type d -exec chmod 755 {} \;
-find /var/www/html/wordpress/ -type f -exec chmod 644 {} \;
+echo "Hardening Apache"
+#basic hardening
+sudo sed -i -e "s/ServerTokens OS/ServerTokens Prod/g" /etc/apache2/conf-enabled/security.conf
+sudo sed -i -e "s/ServerSignature On/ServerSignature Off/g" /etc/apache2/conf-enabled/security.conf
+echo "Header unset ETag" | sudo tee -a /etc/apache2/conf-enabled/security.conf
+echo "FileETag None" | sudo tee -a /etc/apache2/conf-enabled/security.conf
+#modsecurity WAF configuration. using basic rule set provided by canonical.
+sudo mv /etc/modsecurity/modsecurity.conf-recommended /etc/modsecurity/modsecurity.conf
+sudo sed -i -e "s/SecRuleEngine DetectionOnly/SecRuleEngine On/g" /etc/apache2/conf-enabled/security.conf
+sudo sed -i -e "s/SecRequestBodyLimit 13107200/SecRequestBodyLimit 16384000/g" /etc/apache2/conf-enabled/security.conf
+sudo sed -i -e "s/SecRequestBodyInMemoryLimit 131072/SecRequestBodyInMemoryLimit 163840/g" /etc/apache2/conf-enabled/security.conf
+#mod_evasive configuration. helps against dos/ddos attacks.
+sudo mkdir /var/log/mod_evasive
+sudo chown www-data:www-data /var/log/mod_evasive
+sudo sed -i -e "s/#//g" /etc/apache2/mods-available/evasive.conf
+sudo sed -i -e "s/DOSSystemCommand/#DOSSystemCommand/g" /etc/apache2/mods-available/evasive.conf
+sudo sed -i -e "s/you@yourdomain.com/$modevasivemail/g" /etc/apache2/mods-available/evasive.conf
+
+
+echo "Moving wordpress to apache root and do final hardening"
+sudo mv /tmp/wordpress /var/www/html/
+sudo find /var/www/html/wordpress/ -type d -exec chmod 755 {} \;
+sudo find /var/www/html/wordpress/ -type f -exec chmod 644 {} \;
 
 if ! [[ -f /etc/apache2/conf-available/fqdn.conf ]]
 then
@@ -137,6 +145,7 @@ then
 	sudo a2enconf fqdn
 fi
 
+sudo a2enmod headers
 sudo service apache2 restart
 if [[ "$?" -ne 0 ]]
 then

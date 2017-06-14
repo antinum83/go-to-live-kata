@@ -1,0 +1,13 @@
+Lo script provvede a:
+-scaricare wordpress dal sito ufficiale
+-installare i prerequisiti tramite apt-get
+-hardenizzare i prerequisiti
+-hardenizzare wordpress
+-installare wordpress
+
+per lanciare lo script:
+$ chmod +x xpeppers.sh
+$ ./xpeppers.sh <version|latest> <wordpress_db_name> <mysql_user> <mysql_password> <mod-evasive notifications email>
+Il primo parametro è la versione di wordpress da scaricare. Usare latest per l'ultima versione.
+
+L'installazione ricalca https://codex.wordpress.org/Installing_WordPress, mentre l'hardenizzazione di apache, php e wordpress è stata effettuata seguendo https://codex.wordpress.org/Hardening_WordPress and https://blog.mattbrock.co.uk/hardening-the-security-on-ubuntu-server-14-04/. Per quanto riguarda apache è stata seguita in parte anche la raccomandazione CIS https://benchmarks.cisecurity.org/tools2/apache/CIS_Apache_HTTP_Server_2.4_Benchmark_v1.3.0.pdf. Non è stata eseguita per intero questa hardenizzazione per mancanza di tempo.
