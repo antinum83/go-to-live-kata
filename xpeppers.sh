@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#cfr https://codex.wordpress.org/Installing_WordPress
+
 if [ "$#" -ne 4 ]
 then
 	echo "Usage: ./xpeppers.sh <version|latest> <wordpress_db_name> <mysql_user> <mysql_password>"
@@ -41,21 +43,25 @@ else
 fi
 
 echo "Installing wordpress prerequisites"
-sudo apt-get install apache2 mysql-server php5
+sudo apt-get install apache2 mysql-server php5 php5-mysqlnd-ms
 
 echo "Setting up mysql"
 cp mysql_template.sql mysql.sql
-sed -i -e "s/db_name_here/$dbname/g" mysql.sql 
+sed -i -e "s/db_name_here/$dbname/g" mysql.sql
+sed -i -e "s/user_name_here/$mysqluser/g" mysql.sql
+sed -i -e "s/password_here/$mysqlpasswd/g" mysql.sql
+
 cat mysql.sql | mysql -u root -p
+rm ./mysql.sql
 
 echo "Extracting wordpress"
 tar xfz /tmp/wordpress-${version}.tar.gz -C /tmp
 
 echo "Modifying wp-config.php file"
-cp /tmp/wordpress/wp-config-sample.php /tmp/wordpress/wp-config.php
-sed -i -e 's/database_name_here/wordpress/g' /tmp/wordpress/wp-config.php
-sed -i -e 's/username_here/testuser/g' /tmp/wordpress/wp-config.php
-sed -i -e 's/password_here/password/g' /tmp/wordpress/wp-config.php
+mv /tmp/wordpress/wp-config-sample.php /tmp/wordpress/wp-config.php
+sed -i -e "s/database_name_here/$dbname/g" /tmp/wordpress/wp-config.php
+sed -i -e "s/username_here/$mysqluser/g" /tmp/wordpress/wp-config.php
+sed -i -e "s/password_here/$mysqlpasswd/g" /tmp/wordpress/wp-config.php
 
 while [[ $(grep 'put your unique phrase here' /tmp/wordpress/wp-config.php) != "" ]]
 do
@@ -65,4 +71,16 @@ done
 
 sudo mv /tmp/wordpress /var/www/html/
 
-echo "Done!"
+if ! [[ -f /etc/apache2/conf-available/fqdn.conf ]]
+then
+	echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/fqdn.conf
+	sudo a2enconf fqdn
+fi
+
+sudo service apache2 restart
+
+echo "Installation OK. Launching Firefox..."
+
+firefox http://localhost/wordpress/wp-admin/install.php
+
+
