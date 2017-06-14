@@ -1,16 +1,19 @@
 #!/bin/bash
 
+if [ "$#" -ne 4 ]
+then
+	echo "Usage: ./xpeppers.sh <version|latest> <wordpress_db_name> <mysql_user> <mysql_password>"
+exit 1
+fi
+
+version=$1
+dbname=$2
+mysqluser=$3
+mysqlpasswd=$4
+
 echo "Cleaning up files"
 rm -rf /tmp/wordpress*
 sudo rm -rf /var/www/html/wordpress*
-
-version=$1
-
-if [[ "$version" == "" ]]
-then
-	echo "Usage: ./xpeppers.sh <version|latest>"
-	exit 1
-fi 
 
 echo "Testing network connection"
 if [[ "$(ping -c 1 8.8.8.8 | grep '100% packet loss' )" != "" ]]
@@ -41,6 +44,8 @@ echo "Installing wordpress prerequisites"
 sudo apt-get install apache2 mysql-server php5
 
 echo "Setting up mysql"
+cp mysql_template.sql mysql.sql
+sed -i -e "s/db_name_here/$dbname/g" mysql.sql 
 cat mysql.sql | mysql -u root -p
 
 echo "Extracting wordpress"
